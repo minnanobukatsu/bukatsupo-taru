@@ -1,0 +1,1620 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>みんなのBUKATSU 秘書</title>
+    <meta name="description" content="部活動運営をサポートする統合管理ツール">
+    <style>
+        :root {
+            --primary-color: #2E7D32;
+            --secondary-color: #4CAF50;
+            --accent-color: #81C784;
+            --bg-color: #f4f6f8;
+            --sidebar-bg: #1B5E20;
+            --card-bg: #ffffff;
+            --text-main: #333333;
+            --text-sub: #666666;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --radius: 12px;
+            --sidebar-width: 250px;
+            --sidebar-collapsed-width: 60px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            display: flex;
+            min-height: 100vh;
+            overflow-x: hidden; /* サイドバートランジション用 */
+        }
+
+        /* サイドバー */
+        .sidebar {
+            width: var(--sidebar-width);
+            background-color: var(--sidebar-bg);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            padding: 20px 0;
+            position: fixed;
+            height: 100vh;
+            left: 0;
+            top: 0;
+            z-index: 200;
+            transition: width 0.3s ease, transform 0.3s ease;
+            white-space: nowrap; /* 文字折り返し防止 */
+        }
+
+        /* サイドバーが閉じている時 (PC) */
+        .sidebar.collapsed {
+            width: var(--sidebar-collapsed-width);
+        }
+        .sidebar.collapsed .app-title span:last-child,
+        .sidebar.collapsed .nav-text {
+            opacity: 0;
+            pointer-events: none;
+            display: none;
+        }
+        .sidebar.collapsed .logo-area {
+            padding: 0 10px 20px;
+            text-align: center;
+        }
+        .sidebar.collapsed .nav-item {
+            padding: 15px 0;
+            justify-content: center;
+        }
+        .sidebar.collapsed .nav-icon {
+            margin: 0;
+            font-size: 1.4rem;
+        }
+
+        .logo-area {
+            padding: 0 20px 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            margin-bottom: 20px;
+            transition: padding 0.3s;
+        }
+
+        .app-title {
+            font-size: 1.2rem;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            overflow: hidden;
+        }
+
+        .nav-menu {
+            list-style: none;
+            flex: 1;
+        }
+
+        .nav-item {
+            cursor: pointer;
+            padding: 15px 25px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            transition: background 0.2s;
+            font-size: 1rem;
+            color: rgba(255,255,255,0.8);
+            border-left: 4px solid transparent;
+            overflow: hidden;
+        }
+
+        .nav-item:hover {
+            background-color: rgba(255,255,255,0.1);
+            color: white;
+        }
+
+        .nav-item.active {
+            background-color: rgba(255,255,255,0.15);
+            color: white;
+            border-left-color: var(--accent-color);
+            font-weight: bold;
+        }
+
+        .nav-icon {
+            font-size: 1.2rem;
+            width: 24px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+
+        /* ハンバーガーボタン */
+        .menu-toggle {
+            position: fixed;
+            top: 15px;
+            left: 15px;
+            z-index: 300;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 5px 10px;
+            cursor: pointer;
+            font-size: 1.2rem;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        /* メインコンテンツ */
+        .main-content {
+            flex: 1;
+            margin-left: var(--sidebar-width);
+            padding: 20px;
+            padding-top: 60px; /* ハンバーガーボタン回避 */
+            padding-bottom: 100px; /* FAB用スペース */
+            max-width: 100%;
+            transition: margin-left 0.3s ease;
+        }
+        
+        /* サイドバー連動 */
+        .sidebar.collapsed + .main-content {
+            margin-left: var(--sidebar-collapsed-width);
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .section-title {
+            font-size: 1.5rem;
+            color: var(--primary-color);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* セクション切り替え */
+        .content-section {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .content-section.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* 共通コンポーネント */
+        .btn {
+            padding: 8px 16px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            transition: opacity 0.2s;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+        }
+        .btn:hover { opacity: 0.9; }
+        .btn-primary { background: var(--primary-color); color: white; }
+        .btn-secondary { background: #f0f0f0; color: #333; }
+        .btn-danger { background: #ffebee; color: #d32f2f; }
+        .btn-warning { background: #FFF3E0; color: #E65100; }
+
+        .search-bar {
+            width: 100%;
+            max-width: 600px;
+            padding: 10px 15px;
+            border-radius: 20px;
+            border: 1px solid #ddd;
+            font-size: 1rem;
+            margin-bottom: 20px;
+        }
+
+        /* --- HOMEセクション --- */
+        .dashboard-header {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            padding: 30px;
+            border-radius: var(--radius);
+            margin-bottom: 20px;
+            box-shadow: var(--shadow);
+        }
+        .greeting { font-size: 1.8rem; font-weight: bold; margin-bottom: 10px; }
+        .date-display { font-size: 1rem; opacity: 0.9; }
+
+        .quick-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            text-align: center;
+        }
+        .stat-value { font-size: 2rem; font-weight: bold; color: var(--primary-color); }
+        .stat-label { color: var(--text-sub); font-size: 0.9rem; }
+
+        /* --- アプリ図鑑セクション --- */
+        .category-filter {
+            display: flex;
+            gap: 10px;
+            overflow-x: auto;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+        .cat-btn {
+            background: white;
+            border: 1px solid #ddd;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            white-space: nowrap;
+            cursor: pointer;
+        }
+        .cat-btn.active {
+            background-color: var(--secondary-color);
+            color: white;
+            border-color: var(--secondary-color);
+        }
+        .app-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+        }
+        .app-card {
+            background: var(--card-bg);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            transition: transform 0.2s, box-shadow 0.2s, opacity 0.2s;
+        }
+        .app-card.draggable { cursor: grab; }
+        .app-card.dragging { opacity: 0.4; cursor: grabbing; border: 2px dashed var(--secondary-color); }
+        .app-card.over { transform: scale(1.02); box-shadow: 0 0 10px rgba(46, 125, 50, 0.3); border: 2px solid var(--primary-color); }
+
+        .app-card-header { display: flex; align-items: center; margin-bottom: 10px; pointer-events: none; /* ドラッグしやすくするため子要素イベント抑制 */ }
+        .app-icon { font-size: 2.5rem; margin-right: 15px; }
+        .app-info h3 { font-size: 1.1rem; margin-bottom: 2px; }
+        .app-category { font-size: 0.75rem; background: #e8f5e9; color: var(--primary-color); padding: 2px 6px; border-radius: 4px; }
+        .app-desc { font-size: 0.9rem; color: var(--text-sub); margin-bottom: 15px; flex: 1; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; pointer-events: none; }
+        .admin-controls { position: absolute; top: 10px; right: 10px; display: flex; gap: 5px; z-index: 10; }
+        .icon-btn { background: none; border: none; cursor: pointer; color: #aaa; padding: 5px; border-radius: 50%; font-size: 1rem; transition: background 0.2s; }
+        .icon-btn:hover { background: #eee; color: #333; }
+        .app-card-actions { display: flex; gap: 10px; margin-top: auto; z-index: 10; }
+
+        /* --- Geminiログセクション --- */
+        .log-list { list-style: none; }
+        .log-item {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: transform 0.2s, border 0.2s, opacity 0.2s;
+        }
+        .log-item.draggable { cursor: grab; }
+        .log-item:hover { transform: translateX(5px); border-left: 4px solid var(--accent-color); }
+        .log-item.dragging { opacity: 0.4; cursor: grabbing; border: 2px dashed var(--secondary-color); }
+        .log-item.over { border: 2px solid var(--primary-color); transform: scale(1.01); }
+
+        .log-content { flex: 1; pointer-events: none; }
+        /* リンクはクリック可能に */
+        .log-content a { pointer-events: auto; }
+        
+        .log-title { font-weight: bold; font-size: 1rem; color: var(--text-main); margin-bottom: 4px; display: block; text-decoration: none;}
+        .log-title:hover { color: var(--primary-color); text-decoration: underline; }
+        .log-meta { font-size: 0.8rem; color: var(--text-sub); display: flex; gap: 10px; flex-wrap: wrap; align-items: center;}
+        .log-category-badge { background: #fff3e0; color: #ef6c00; padding: 2px 6px; border-radius: 4px; font-weight: bold; }
+        .log-tag { background: #e3f2fd; color: #1976d2; padding: 2px 6px; border-radius: 4px; }
+
+        /* --- Driveセクション --- */
+        .drive-breadcrumb {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            margin-bottom: 20px;
+            font-size: 0.95rem;
+            color: var(--text-sub);
+            flex-wrap: wrap;
+        }
+        .breadcrumb-item { cursor: pointer; color: var(--primary-color); font-weight: bold; }
+        .breadcrumb-item:hover { text-decoration: underline; }
+        .breadcrumb-current { color: var(--text-main); font-weight: normal; cursor: default; }
+        .breadcrumb-separator { color: #999; }
+
+        .drive-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        .drive-card {
+            background: white;
+            padding: 20px;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            text-align: center;
+            text-decoration: none;
+            color: var(--text-main);
+            transition: transform 0.2s, opacity 0.2s;
+            position: relative;
+            border: 1px solid transparent;
+            cursor: pointer;
+        }
+        .drive-card:hover { transform: translateY(-3px); border-color: var(--secondary-color); }
+        .drive-card.draggable { cursor: grab; }
+        .drive-card.dragging { opacity: 0.4; cursor: grabbing; border: 2px dashed var(--secondary-color); }
+        .drive-card.over { border: 2px solid var(--primary-color); transform: scale(1.05); }
+
+        .drive-card.is-folder { background-color: #fcfcfc; border-color: #eee; }
+        .drive-card.is-folder .drive-icon { color: #FFC107; }
+
+        .drive-icon { width: 48px; height: 48px; margin: 0 auto 10px; display: flex; align-items: center; justify-content: center; font-size: 2rem; pointer-events: none; }
+        .drive-name { font-weight: 600; font-size: 0.95rem; line-height: 1.3; pointer-events: none; }
+        .drive-type { font-size: 0.75rem; color: var(--text-sub); margin-top: 5px; pointer-events: none; }
+
+        /* --- 設定セクション --- */
+        .settings-card {
+            background: white;
+            padding: 25px;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            margin-bottom: 20px;
+        }
+        .settings-desc {
+            margin-bottom: 20px;
+            color: #666;
+            line-height: 1.6;
+        }
+        .backup-area {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        .backup-action {
+            flex: 1;
+            min-width: 250px;
+            padding: 20px;
+            border: 1px solid #eee;
+            border-radius: 8px;
+            background: #fafafa;
+        }
+        .backup-action h4 { margin-bottom: 10px; font-size: 1.1rem; }
+        .backup-action p { font-size: 0.9rem; color: #666; margin-bottom: 15px; }
+
+        /* FAB */
+        .fab {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            width: 60px;
+            height: 60px;
+            background-color: var(--secondary-color);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 30px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            cursor: pointer;
+            border: none;
+            transition: transform 0.2s;
+            z-index: 900;
+        }
+        .fab:hover { transform: scale(1.1) rotate(90deg); }
+
+        /* モーダル */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center;
+            z-index: 1000; opacity: 0; visibility: hidden; transition: opacity 0.3s;
+        }
+        .modal-overlay.active { opacity: 1; visibility: visible; }
+        .modal-content {
+            background: white; padding: 30px; border-radius: var(--radius);
+            width: 90%; max-width: 500px; max-height: 90vh; overflow-y: auto;
+        }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 0.9rem; }
+        .form-control { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; }
+        .form-control:disabled { background: #eee; color: #999; }
+
+        /* モバイル対応 */
+        @media (max-width: 768px) {
+            .menu-toggle { display: none; }
+            .sidebar {
+                width: 100%;
+                height: auto;
+                bottom: 0;
+                top: auto;
+                flex-direction: row;
+                padding: 0;
+                justify-content: space-around;
+                transform: translateY(0);
+            }
+            .sidebar.collapsed {
+                width: 100%;
+                transform: translateY(100%);
+            }
+            .logo-area { display: none; }
+            .nav-menu { display: flex; width: 100%; justify-content: space-around; }
+            .nav-item {
+                flex-direction: column;
+                padding: 10px;
+                gap: 5px;
+                font-size: 0.7rem;
+                border-left: none;
+                border-top: 4px solid transparent;
+            }
+            .nav-item.active { border-top-color: var(--accent-color); border-left: none; }
+            .nav-text { display: block; opacity: 1 !important; pointer-events: auto !important; display: block !important;}
+            .main-content { margin-left: 0 !important; padding-bottom: 100px; }
+            .fab { bottom: 80px; }
+            .menu-toggle { display: flex; }
+        }
+    </style>
+</head>
+<body>
+
+    <button id="menuToggle" class="menu-toggle">≡</button>
+
+    <!-- サイドバー -->
+    <nav id="sidebar" class="sidebar">
+        <div class="logo-area">
+            <div class="app-title">
+                <span>⚡</span> <span>みんなのBUKATSU 秘書</span>
+            </div>
+        </div>
+        <ul class="nav-menu">
+            <li class="nav-item active" data-target="home">
+                <span class="nav-icon">🏠</span>
+                <span class="nav-text">ホーム</span>
+            </li>
+            <li class="nav-item" data-target="apps">
+                <span class="nav-icon">📱</span>
+                <span class="nav-text">アプリ図鑑</span>
+            </li>
+            <li class="nav-item" data-target="logs">
+                <span class="nav-icon">💬</span>
+                <span class="nav-text">Geminiログ</span>
+            </li>
+            <li class="nav-item" data-target="drive">
+                <span class="nav-icon">📂</span>
+                <span class="nav-text">ドライブ</span>
+            </li>
+            <li class="nav-item" data-target="settings">
+                <span class="nav-icon">⚙️</span>
+                <span class="nav-text">設定</span>
+            </li>
+            <li class="nav-item" id="nav-help">
+                <span class="nav-icon">❓</span>
+                <span class="nav-text">使い方</span>
+            </li>
+        </ul>
+    </nav>
+
+    <!-- メインコンテンツ -->
+    <main class="main-content">
+        
+        <!-- ホームセクション -->
+        <section id="section-home" class="content-section active">
+            <div class="dashboard-header">
+                <div class="greeting" id="greetingMsg">こんにちは！</div>
+                <div class="date-display" id="dateDisplay">2023年1月1日</div>
+            </div>
+            <div class="section-header">
+                <h2 class="section-title">📊 ステータス</h2>
+            </div>
+            <div class="quick-stats">
+                <div class="stat-card">
+                    <div class="stat-value" id="statAppCount">0</div>
+                    <div class="stat-label">登録アプリ</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="statLogCount">0</div>
+                    <div class="stat-label">Geminiログ</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="statDriveCount">0</div>
+                    <div class="stat-label">ドライブアイテム</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- アプリ図鑑セクション -->
+        <section id="section-apps" class="content-section">
+            <div class="section-header">
+                <h2 class="section-title">📱 アプリ図鑑</h2>
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <span style="font-size:0.8rem; color:#666;">※並び替えは「すべて」表示時のみ可</span>
+                    <button class="btn btn-secondary" onclick="openCategoryModal()">⚙️ カテゴリー設定</button>
+                </div>
+            </div>
+            <input type="text" id="appSearchInput" class="search-bar" placeholder="アプリ名で検索...">
+            <div id="appCategoryFilter" class="category-filter"></div>
+            <div id="appGrid" class="app-grid"></div>
+        </section>
+
+        <!-- Geminiログセクション -->
+        <section id="section-logs" class="content-section">
+            <div class="section-header">
+                <h2 class="section-title">💬 Geminiチャットログ</h2>
+                <span style="font-size:0.8rem; color:#666;">※並び替えは「すべて」表示時のみ可</span>
+            </div>
+            <input type="text" id="logSearchInput" class="search-bar" placeholder="タイトルやタグで検索...">
+            <div id="logCategoryFilter" class="category-filter"></div>
+            <div id="logList" class="log-list"></div>
+        </section>
+
+        <!-- ドライブセクション -->
+        <section id="section-drive" class="content-section">
+            <div class="section-header">
+                <h2 class="section-title">📂 Googleドライブ管理</h2>
+                <span style="font-size:0.8rem; color:#666;">※ドラッグで並び替え可</span>
+            </div>
+            <div class="section-desc" style="margin-bottom: 20px; color: #666; font-size: 0.9rem;">
+                ファイルやフォルダへのリンクを整理できます。「フォルダ（内部用）」を作ると階層管理ができます。
+            </div>
+            
+            <div id="driveBreadcrumb" class="drive-breadcrumb"></div>
+
+            <div id="driveGrid" class="drive-grid"></div>
+        </section>
+
+        <!-- 設定セクション -->
+        <section id="section-settings" class="content-section">
+            <div class="section-header">
+                <h2 class="section-title">⚙️ 設定</h2>
+            </div>
+            
+            <div class="settings-card">
+                <h3 style="margin-bottom:15px; border-bottom:1px solid #eee; padding-bottom:10px;">💾 データのバックアップと復元</h3>
+                <p class="settings-desc">
+                    登録したデータをファイル（JSON形式）として保存できます。<br>
+                    ブラウザのキャッシュを削除する前や、他の端末にデータを移したい場合にご利用ください。
+                </p>
+                <div class="backup-area">
+                    <div class="backup-action">
+                        <h4>📤 バックアップを作成</h4>
+                        <p>現在のデータをダウンロードします。</p>
+                        <button class="btn btn-primary" onclick="exportData()">データを保存する</button>
+                    </div>
+                    <div class="backup-action">
+                        <h4>📥 バックアップから復元</h4>
+                        <p>保存したファイルを読み込み、データを復元します。<br><span style="color:#d32f2f; font-size:0.8rem;">※現在のデータは上書きされます</span></p>
+                        <input type="file" id="importFileInput" accept=".json" style="display:none;" onchange="importData(this)">
+                        <button class="btn btn-secondary" onclick="document.getElementById('importFileInput').click()">ファイルを選択</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="settings-card">
+                <h3 style="margin-bottom:15px; border-bottom:1px solid #eee; padding-bottom:10px; color:#d32f2f;">⚠️ データの初期化</h3>
+                <p class="settings-desc">
+                    すべてのデータを削除し、初期状態に戻します。この操作は取り消せません。
+                </p>
+                <button class="btn btn-danger" onclick="resetAllData()">すべてのデータを削除する</button>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- FAB -->
+    <button id="fabBtn" class="fab">＋</button>
+
+    <!-- アプリ登録モーダル -->
+    <div id="appModal" class="modal-overlay">
+        <div class="modal-content">
+            <h2 class="section-title" id="appModalTitle">アプリを登録</h2>
+            <form id="appForm">
+                <input type="hidden" id="appEditIndex">
+                <div class="form-group">
+                    <label>カテゴリー</label>
+                    <select id="appInputCategory" class="form-control" required></select>
+                </div>
+                <div class="form-group">
+                    <label>アイコン (絵文字)</label>
+                    <input type="text" id="appInputIcon" class="form-control" placeholder="例: 🏀" maxlength="4" required>
+                </div>
+                <div class="form-group">
+                    <label>アプリタイトル</label>
+                    <input type="text" id="appInputTitle" class="form-control" placeholder="アプリ名" required>
+                </div>
+                <div class="form-group">
+                    <label>概要</label>
+                    <input type="text" id="appInputDesc" class="form-control" placeholder="短い説明文" required>
+                </div>
+                <div class="form-group">
+                    <label>アプリURL</label>
+                    <input type="url" id="appInputUrl" class="form-control" placeholder="https://..." required>
+                </div>
+                <div class="form-group">
+                    <label>GeminiチャットURL</label>
+                    <input type="url" id="appInputChatUrl" class="form-control" placeholder="編集用URL">
+                </div>
+                <div class="modal-actions" style="display:flex; justify-content:flex-end; gap:10px;">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('appModal')">キャンセル</button>
+                    <button type="submit" class="btn btn-primary">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ログ登録モーダル -->
+    <div id="logModal" class="modal-overlay">
+        <div class="modal-content">
+            <h2 class="section-title" id="logModalTitle">ログを登録</h2>
+            <form id="logForm">
+                <input type="hidden" id="logEditIndex">
+                <div class="form-group">
+                    <label>カテゴリー</label>
+                    <select id="logInputCategory" class="form-control" required></select>
+                </div>
+                <div class="form-group">
+                    <label>タイトル</label>
+                    <input type="text" id="logInputTitle" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label>チャットURL</label>
+                    <input type="url" id="logInputUrl" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label>タグ (カンマ区切り)</label>
+                    <input type="text" id="logInputTags" class="form-control" placeholder="例: アイデア, 修正, 保留">
+                </div>
+                <div class="form-group">
+                    <label>メモ</label>
+                    <textarea id="logInputMemo" class="form-control" rows="3"></textarea>
+                </div>
+                <div class="modal-actions" style="display:flex; justify-content:flex-end; gap:10px;">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('logModal')">キャンセル</button>
+                    <button type="submit" class="btn btn-primary">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ドライブ登録モーダル -->
+    <div id="driveModal" class="modal-overlay">
+        <div class="modal-content">
+            <h2 class="section-title" id="driveModalTitle">アイテムを登録</h2>
+            <form id="driveForm">
+                <input type="hidden" id="driveEditIndex">
+                <div class="form-group">
+                    <label>種類</label>
+                    <select id="driveInputType" class="form-control" onchange="toggleDriveUrlInput()">
+                        <option value="folder">📁 Googleドライブのフォルダ</option>
+                        <option value="doc">📄 ドキュメント</option>
+                        <option value="sheet">📊 スプレッドシート</option>
+                        <option value="slide">📑 スライド</option>
+                        <option value="form">📝 フォーム</option>
+                        <option value="other">🔗 その他リンク</option>
+                        <option value="folder_container" style="font-weight:bold; color:var(--primary-color);">📁 フォルダ（整理用・内部作成）</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>名前</label>
+                    <input type="text" id="driveInputName" class="form-control" required>
+                </div>
+                <div class="form-group" id="driveUrlGroup">
+                    <label>URL</label>
+                    <input type="url" id="driveInputUrl" class="form-control" required>
+                </div>
+                <div class="modal-actions" style="display:flex; justify-content:flex-end; gap:10px;">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('driveModal')">キャンセル</button>
+                    <button type="submit" class="btn btn-primary">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- カテゴリー管理モーダル -->
+    <div id="categoryModal" class="modal-overlay">
+        <div class="modal-content">
+            <h2 class="section-title">カテゴリー管理</h2>
+            <p style="font-size:0.9rem; margin-bottom:10px;">アプリとGeminiログ共通のカテゴリーです。</p>
+            <ul id="categoryList" class="log-list"></ul>
+            <div class="form-group" style="display:flex; gap:10px; margin-top:20px;">
+                <input type="text" id="newCategoryInput" class="form-control" placeholder="新規カテゴリー">
+                <button type="button" id="addCategoryBtn" class="btn btn-primary">追加</button>
+            </div>
+            <div class="modal-actions" style="display:flex; justify-content:flex-end; gap:10px; margin-top:10px;">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('categoryModal')">閉じる</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 削除確認モーダル -->
+    <div id="deleteModal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 400px;">
+            <h2 class="section-title" style="color: #d32f2f;">削除の確認</h2>
+            <p id="deleteMessage" style="margin: 20px 0;">本当に削除しますか？</p>
+            <div class="modal-actions" style="display:flex; justify-content:flex-end; gap:10px;">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('deleteModal')">キャンセル</button>
+                <button type="button" id="confirmDeleteBtn" class="btn btn-danger">削除実行</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 使い方モーダル -->
+    <div id="helpModal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 650px;">
+            <h2 class="section-title">使い方ガイド 📖</h2>
+            <div style="line-height: 1.8; color: #444; font-size: 0.95rem;">
+                <p>このアプリは、部活動や日々の活動に必要なWebアプリ、チャットログ、ドライブのリンクを一元管理できる「秘書」ツールです。</p>
+                
+                <h3 style="color:var(--primary-color); border-bottom:2px solid #e0e0e0; padding-bottom:5px; margin-top:25px; margin-bottom: 10px;">📱 アプリ図鑑</h3>
+                <p>作成したWebアプリをカード形式で整理します。</p>
+                <ul style="padding-left: 20px;">
+                    <li><strong>起動:</strong> 緑色の「起動する」ボタンを押すと、新しいタブでアプリが開きます。</li>
+                    <li><strong>新規登録:</strong> 画面右下の <span style="background:var(--secondary-color); color:white; padding:2px 6px; border-radius:50%;">＋</span> ボタンを押して登録します。</li>
+                    <li><strong>編集:</strong> カード右上の <span style="background:#eee; padding:2px 5px; border-radius:4px;">✎</span> アイコンで内容を修正できます。</li>
+                    <li><strong>削除:</strong> カード右上の <span style="background:#eee; padding:2px 5px; border-radius:4px;">🗑</span> アイコンで削除します（確認画面が出ます）。</li>
+                    <li><strong>並び替え:</strong> カードを長押ししてドラッグすると並び替えができます。<br><small style="color:#d32f2f;">※並び替えは、検索ボックスが空で、カテゴリーが「すべて」の時のみ有効です。</small></li>
+                </ul>
+
+                <h3 style="color:var(--primary-color); border-bottom:2px solid #e0e0e0; padding-bottom:5px; margin-top:25px; margin-bottom: 10px;">💬 Geminiログ</h3>
+                <p>Geminiとの重要なチャットURLを保存し、タグやメモで管理します。</p>
+                <ul style="padding-left: 20px;">
+                    <li><strong>活用法:</strong> 「あのプロンプトどこだっけ？」を防ぐために、チャットのURLと概要を記録しましょう。</li>
+                    <li><strong>検索:</strong> 上部の検索バーで、タイトルやタグから素早く検索できます。</li>
+                </ul>
+
+                <h3 style="color:var(--primary-color); border-bottom:2px solid #e0e0e0; padding-bottom:5px; margin-top:25px; margin-bottom: 10px;">📂 ドライブ管理</h3>
+                <p>Googleドライブのファイルやフォルダへのショートカット集です。</p>
+                <ul style="padding-left: 20px;">
+                    <li><strong>階層管理:</strong> アイテム追加時に「種類」で<strong>「📁 フォルダ（整理用・内部作成）」</strong>を選ぶと、このアプリ内だけの整理用フォルダを作れます。</li>
+                    <li><strong>移動:</strong> フォルダをクリックすると中に入ります。上の「📂 ルート > ...」を押すと戻れます。</li>
+                    <li><strong>並び替え:</strong> アイコンをドラッグして自由に配置を変更できます。</li>
+                </ul>
+
+                <h3 style="color:var(--primary-color); border-bottom:2px solid #e0e0e0; padding-bottom:5px; margin-top:25px; margin-bottom: 10px;">💾 データの保存とバックアップ</h3>
+                <p>
+                    データはブラウザに保存されますが、履歴削除などで消える可能性があります。<br>
+                    <strong>「⚙️ 設定」メニューから「データを保存する」ボタンを押して、バックアップファイル（JSON）を定期的にダウンロードしてください。</strong><br>
+                    復元したい時は、「ファイルを選択」から保存したJSONファイルを読み込んでください。
+                </p>
+            </div>
+            <div class="modal-actions" style="display:flex; justify-content:flex-end; margin-top:20px;">
+                <button type="button" class="btn btn-primary" onclick="closeModal('helpModal')">閉じる</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- データ管理 ---
+        const initialApps = [
+            { category: "スポーツ", title: "バスケ作戦盤🏀", url: "https://minnanobukatsu.github.io/Basketstrategy/", chatUrl: "https://gemini.google.com/app/e86bb29d0b00e8a0", icon: "🏀", desc: "戦略を視覚化する作戦ボード" },
+            { category: "スポーツ", title: "ダブルス組み合わせ🎾", url: "https://minnanobukatsu.github.io/doubles-maker/", chatUrl: "", icon: "🎾", desc: "総当たりのペア決めを自動化" },
+            { category: "スポーツ", title: "バスケデジタルタイマー⏱", url: "https://minnanobukatsu.github.io/basketball-timer/", chatUrl: "", icon: "⏱", desc: "試合用大型タイマー" },
+            { category: "ツール", title: "画像編集アプリ🖼", url: "https://minnanobukatsu.github.io/imageediting/", chatUrl: "https://gemini.google.com/app/27e0db2b00c22f34", icon: "🖼", desc: "簡易画像加工ツール" },
+            { category: "スポーツ", title: "みんなのスポーツテスト", url: "https://minnanobukatsu.github.io/sportstest/", chatUrl: "https://gemini.google.com/app/a8074ac20bb9f9d8", icon: "💪", desc: "体力測定の記録と評価" },
+            { category: "ツール", title: "みんなのルーレット", url: "https://minnanobukatsu.github.io/Everyone-s-Roulette/", chatUrl: "https://gemini.google.com/app/d209c25d84a2b5e8", icon: "🎡", desc: "抽選や罰ゲーム決めに" },
+            { category: "ツール", title: "みんなのあみだ", url: "https://minnanobukatsu.github.io/amida/", chatUrl: "https://gemini.google.com/app/428de09a08a9fa05", icon: "🕸", desc: "公平なあみだくじ" },
+            { category: "ツール", title: "トーク＆罰ゲームガチャ", url: "https://minnanobukatsu.github.io/batsugacha/", chatUrl: "https://gemini.google.com/app/cb4f3a4a0759f876", icon: "💊", desc: "トークテーマや罰ゲームを選出" },
+            { category: "ツール", title: "サイコロ🎲", url: "https://minnanobukatsu.github.io/saikoro/", chatUrl: "https://gemini.google.com/app/79df729fa56c0ccb", icon: "🎲", desc: "シンプルなサイコロ機能" },
+            { category: "ゲーム", title: "モグラ叩き", url: "https://minnanobukatsu.github.io/moguratataki/", chatUrl: "https://gemini.google.com/app/7cf019f7e3a5b928", icon: "🐹", desc: "反射神経ゲーム" },
+            { category: "ゲーム", title: "はぁって言うゲーム！", url: "https://minnanobukatsu.github.io/ha-game/", chatUrl: "https://gemini.google.com/app/438da44bac42f6e8", icon: "😤", desc: "演技力パーティゲーム" },
+            { category: "ゲーム", title: "ブロック崩し", url: "https://minnanobukatsu.github.io/blockkuzushi/", chatUrl: "https://gemini.google.com/app/5daff44d72aff644", icon: "🧱", desc: "ネオン風ブロック崩し" },
+            { category: "スポーツ", title: "球技大会運営", url: "https://minnanobukatsu.github.io/kyuugitaikai/", chatUrl: "https://gemini.google.com/app/a1a3447a5efa23f1", icon: "📋", desc: "リーグ戦・トーナメント管理" },
+            { category: "スポーツ", title: "反応速度計測ゲーム", url: "https://minnanobukatsu.github.io/hannousokudo/", chatUrl: "https://gemini.google.com/app/61dd7af0f085ae17", icon: "⚡", desc: "反射神経をミリ秒で計測" },
+            { category: "スポーツ", title: "簡易視力検査アプリ", url: "https://minnanobukatsu.github.io/shiryokukensa/", chatUrl: "https://gemini.google.com/app/69abe67fb6611494", icon: "👁", desc: "スマホで視力チェック" }
+        ];
+        const initialCategories = ["スポーツ", "ゲーム", "ツール", "未分類"];
+        
+        const KEYS = {
+            APPS: 'minnaApps_v1',
+            CATS: 'minnaApps_categories_v1',
+            LOGS: 'minnaGeminiLogs_v1',
+            DRIVE: 'minnaDriveLinks_v1'
+        };
+
+        let state = {
+            currentTab: 'home',
+            apps: [],
+            categories: [],
+            logs: [],
+            driveLinks: [],
+            appFilter: 'ALL',
+            logFilter: 'ALL',
+            currentDriveFolderId: null, 
+            editingCatIndex: -1,
+            deleteContext: null,
+            dragSrcIndex: null,
+            dragType: null,
+        };
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadData();
+            updateDashboard();
+            setupNavigation();
+            setupForms();
+            setupSidebarToggle();
+            renderAllSections();
+            updateTime();
+            setInterval(updateTime, 60000);
+        });
+
+        // --- Data Loading ---
+        function loadData() {
+            const savedApps = localStorage.getItem(KEYS.APPS);
+            state.apps = savedApps ? JSON.parse(savedApps) : [...initialApps];
+            state.apps = state.apps.map(a => ({...a, category: a.category || "未分類"}));
+
+            const savedCats = localStorage.getItem(KEYS.CATS);
+            state.categories = savedCats ? JSON.parse(savedCats) : [...initialCategories];
+
+            const savedLogs = localStorage.getItem(KEYS.LOGS);
+            state.logs = savedLogs ? JSON.parse(savedLogs) : [];
+            state.logs = state.logs.map(l => ({...l, category: l.category || "未分類"}));
+
+            const savedDrive = localStorage.getItem(KEYS.DRIVE);
+            state.driveLinks = savedDrive ? JSON.parse(savedDrive) : [];
+            state.driveLinks = state.driveLinks.map(d => ({
+                ...d,
+                id: d.id || crypto.randomUUID(),
+                parentId: d.parentId !== undefined ? d.parentId : null, 
+                type: d.type || 'other'
+            }));
+        }
+
+        function saveData(key) {
+            if (key === KEYS.APPS) localStorage.setItem(KEYS.APPS, JSON.stringify(state.apps));
+            if (key === KEYS.CATS) localStorage.setItem(KEYS.CATS, JSON.stringify(state.categories));
+            if (key === KEYS.LOGS) localStorage.setItem(KEYS.LOGS, JSON.stringify(state.logs));
+            if (key === KEYS.DRIVE) localStorage.setItem(KEYS.DRIVE, JSON.stringify(state.driveLinks));
+            updateDashboard(); 
+        }
+
+        // --- Export / Import / Reset ---
+        window.exportData = () => {
+            const data = {
+                apps: state.apps,
+                categories: state.categories,
+                logs: state.logs,
+                driveLinks: state.driveLinks,
+                exportedAt: new Date().toISOString()
+            };
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            const date = new Date().toLocaleDateString('ja-JP').replace(/\//g, '-');
+            a.download = `minna_bukatsu_backup_${date}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        };
+
+        window.importData = (input) => {
+            const file = input.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    if (data.apps && data.categories && data.logs && data.driveLinks) {
+                        if(confirm('現在のデータはすべて上書きされます。よろしいですか？')) {
+                            state.apps = data.apps;
+                            state.categories = data.categories;
+                            state.logs = data.logs;
+                            state.driveLinks = data.driveLinks;
+                            
+                            saveData(KEYS.APPS);
+                            saveData(KEYS.CATS);
+                            saveData(KEYS.LOGS);
+                            saveData(KEYS.DRIVE);
+                            
+                            renderAllSections();
+                            alert('データの復元が完了しました。');
+                        }
+                    } else {
+                        alert('不正なファイル形式です。');
+                    }
+                } catch (err) {
+                    console.error(err);
+                    alert('ファイルの読み込みに失敗しました。');
+                }
+                input.value = ''; // Reset input
+            };
+            reader.readAsText(file);
+        };
+
+        window.resetAllData = () => {
+            if (confirm('本当にすべてのデータを削除しますか？\nこの操作は取り消せません。')) {
+                localStorage.removeItem(KEYS.APPS);
+                localStorage.removeItem(KEYS.CATS);
+                localStorage.removeItem(KEYS.LOGS);
+                localStorage.removeItem(KEYS.DRIVE);
+                location.reload(); // リロードして初期化
+            }
+        };
+
+        // --- D&D Handlers ---
+        function handleDragStart(e, index, type) {
+            state.dragSrcIndex = index;
+            state.dragType = type;
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', index);
+            e.target.classList.add('dragging');
+        }
+
+        function handleDragOver(e) {
+            if (e.preventDefault) e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            return false;
+        }
+
+        function handleDragEnter(e) {
+            e.currentTarget.classList.add('over');
+        }
+
+        function handleDragLeave(e) {
+            e.currentTarget.classList.remove('over');
+        }
+
+        function handleDragEnd(e) {
+            e.target.classList.remove('dragging');
+            document.querySelectorAll('.over').forEach(el => el.classList.remove('over'));
+        }
+
+        function handleDrop(e, dropIndex, type) {
+            if (e.stopPropagation) e.stopPropagation();
+            
+            const srcIndex = state.dragSrcIndex;
+            if (state.dragType === type && srcIndex !== dropIndex) {
+                if (type === 'app') reorderApps(srcIndex, dropIndex);
+                if (type === 'log') reorderLogs(srcIndex, dropIndex);
+                if (type === 'drive') reorderDrive(srcIndex, dropIndex);
+            }
+            return false;
+        }
+
+        function reorderApps(src, dst) {
+            const item = state.apps[src];
+            state.apps.splice(src, 1);
+            state.apps.splice(dst, 0, item);
+            saveData(KEYS.APPS);
+            renderApps();
+        }
+
+        function reorderLogs(src, dst) {
+            const item = state.logs[src];
+            state.logs.splice(src, 1);
+            state.logs.splice(dst, 0, item);
+            saveData(KEYS.LOGS);
+            renderLogs();
+        }
+
+        function reorderDrive(srcIndex, dstIndex) {
+            const parentId = state.currentDriveFolderId;
+            const currentItems = state.driveLinks.filter(d => d.parentId === parentId);
+            const itemToMove = currentItems[srcIndex];
+            
+            const otherItems = [];
+            const folderItems = [];
+            
+            for (let item of state.driveLinks) {
+                if (item.parentId === parentId) {
+                    folderItems.push(item);
+                } else {
+                    otherItems.push(item);
+                }
+            }
+
+            folderItems.splice(srcIndex, 1);
+            folderItems.splice(dstIndex, 0, itemToMove);
+
+            state.driveLinks = [...otherItems, ...folderItems];
+            
+            saveData(KEYS.DRIVE);
+            renderDrive();
+        }
+
+        // --- UI Setup ---
+        function setupSidebarToggle() {
+            const toggleBtn = document.getElementById('menuToggle');
+            const sidebar = document.getElementById('sidebar');
+            toggleBtn.addEventListener('click', () => {
+                sidebar.classList.toggle('collapsed');
+            });
+        }
+
+        function setupNavigation() {
+            const navItems = document.querySelectorAll('.nav-item');
+            const sections = document.querySelectorAll('.content-section');
+            const fab = document.getElementById('fabBtn');
+
+            navItems.forEach(item => {
+                if (!item.id || item.id !== 'nav-help') {
+                    item.addEventListener('click', () => {
+                        navItems.forEach(n => n.classList.remove('active'));
+                        item.classList.add('active');
+
+                        const target = item.dataset.target;
+                        state.currentTab = target;
+                        sections.forEach(s => s.classList.remove('active'));
+                        document.getElementById(`section-${target}`).classList.add('active');
+
+                        // FAB制御
+                        if (target === 'home' || target === 'settings') fab.style.display = 'none';
+                        else fab.style.display = 'flex';
+                    });
+                }
+            });
+
+            document.getElementById('nav-help').addEventListener('click', () => {
+                openModal('helpModal');
+            });
+
+            fab.addEventListener('click', () => {
+                if (state.currentTab === 'apps') openModal('appModal');
+                if (state.currentTab === 'logs') openModal('logModal');
+                if (state.currentTab === 'drive') openModal('driveModal');
+            });
+
+            document.getElementById(`section-home`).classList.add('active');
+            fab.style.display = 'none';
+        }
+
+        function updateTime() {
+            const now = new Date();
+            const dateStr = now.toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' });
+            const timeStr = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+            document.getElementById('dateDisplay').textContent = `${dateStr} ${timeStr}`;
+            
+            const hour = now.getHours();
+            let greet = "こんにちは！";
+            if (hour < 12) greet = "おはようございます！";
+            else if (hour > 17) greet = "お疲れ様です！";
+            document.getElementById('greetingMsg').textContent = greet;
+        }
+
+        function updateDashboard() {
+            document.getElementById('statAppCount').textContent = state.apps.length;
+            document.getElementById('statLogCount').textContent = state.logs.length;
+            document.getElementById('statDriveCount').textContent = state.driveLinks.length;
+        }
+
+        function renderAllSections() {
+            renderApps();
+            renderLogs();
+            renderDrive();
+        }
+
+        // --- Render Functions with D&D ---
+        
+        function renderApps() {
+            const filterContainer = document.getElementById('appCategoryFilter');
+            filterContainer.innerHTML = '';
+            
+            const createBtn = (cat, label) => {
+                const btn = document.createElement('button');
+                btn.className = `cat-btn ${state.appFilter === cat ? 'active' : ''}`;
+                btn.textContent = label;
+                btn.onclick = () => { state.appFilter = cat; renderApps(); };
+                return btn;
+            };
+
+            filterContainer.appendChild(createBtn('ALL', 'すべて'));
+            state.categories.forEach(cat => filterContainer.appendChild(createBtn(cat, cat)));
+
+            const grid = document.getElementById('appGrid');
+            grid.innerHTML = '';
+            const searchVal = document.getElementById('appSearchInput').value.toLowerCase();
+
+            const isFiltering = state.appFilter !== 'ALL' || searchVal !== '';
+
+            const filtered = state.apps.filter(app => {
+                const matchText = app.title.toLowerCase().includes(searchVal) || app.desc.toLowerCase().includes(searchVal);
+                const matchCat = state.appFilter === 'ALL' || app.category === state.appFilter;
+                return matchText && matchCat;
+            });
+
+            if (filtered.length === 0) {
+                grid.innerHTML = '<p style="color:#999; grid-column:1/-1; text-align:center;">アプリがありません</p>';
+                return;
+            }
+
+            filtered.forEach((app, displayIndex) => {
+                const realIndex = state.apps.indexOf(app);
+                
+                const card = document.createElement('div');
+                card.className = 'app-card';
+                
+                if (!isFiltering) {
+                    card.classList.add('draggable');
+                    card.draggable = true;
+                    card.addEventListener('dragstart', (e) => handleDragStart(e, realIndex, 'app'));
+                    card.addEventListener('dragover', handleDragOver);
+                    card.addEventListener('dragenter', handleDragEnter);
+                    card.addEventListener('dragleave', handleDragLeave);
+                    card.addEventListener('drop', (e) => handleDrop(e, realIndex, 'app'));
+                    card.addEventListener('dragend', handleDragEnd);
+                }
+
+                card.innerHTML = `
+                    <div class="admin-controls">
+                        <button class="icon-btn" onclick="editApp(${realIndex})">✎</button>
+                        <button class="icon-btn" onclick="confirmDelete('app', ${realIndex})">🗑</button>
+                    </div>
+                    <div class="app-card-header">
+                        <div class="app-icon">${app.icon}</div>
+                        <div class="app-info">
+                            <span class="app-category">${app.category}</span>
+                            <h3>${app.title}</h3>
+                        </div>
+                    </div>
+                    <div class="app-desc">${app.desc}</div>
+                    <div class="app-card-actions">
+                        <a href="${app.url}" target="_blank" class="btn btn-primary" style="flex:2;">起動する</a>
+                        ${app.chatUrl ? `<a href="${app.chatUrl}" target="_blank" class="btn btn-secondary" style="flex:1;">作成元</a>` : ''}
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+        document.getElementById('appSearchInput').addEventListener('input', renderApps);
+
+        function renderLogs() {
+            const filterContainer = document.getElementById('logCategoryFilter');
+            filterContainer.innerHTML = '';
+            
+            const createBtn = (cat, label) => {
+                const btn = document.createElement('button');
+                btn.className = `cat-btn ${state.logFilter === cat ? 'active' : ''}`;
+                btn.textContent = label;
+                btn.onclick = () => { state.logFilter = cat; renderLogs(); };
+                return btn;
+            };
+
+            filterContainer.appendChild(createBtn('ALL', 'すべて'));
+            state.categories.forEach(cat => filterContainer.appendChild(createBtn(cat, cat)));
+
+            const list = document.getElementById('logList');
+            list.innerHTML = '';
+            const searchVal = document.getElementById('logSearchInput').value.toLowerCase();
+            const isFiltering = state.logFilter !== 'ALL' || searchVal !== '';
+
+            const filtered = state.logs.filter(log => {
+                const matchText = log.title.toLowerCase().includes(searchVal) || (log.tags && log.tags.toLowerCase().includes(searchVal));
+                const matchCat = state.logFilter === 'ALL' || log.category === state.logFilter;
+                return matchText && matchCat;
+            });
+
+            if (filtered.length === 0) {
+                list.innerHTML = '<p style="color:#999; text-align:center;">ログがありません</p>';
+                return;
+            }
+
+            filtered.forEach((log, displayIndex) => {
+                const realIndex = state.logs.indexOf(log);
+                const li = document.createElement('li');
+                li.className = 'log-item';
+                
+                if (!isFiltering) {
+                    li.classList.add('draggable');
+                    li.draggable = true;
+                    li.addEventListener('dragstart', (e) => handleDragStart(e, realIndex, 'log'));
+                    li.addEventListener('dragover', handleDragOver);
+                    li.addEventListener('dragenter', handleDragEnter);
+                    li.addEventListener('dragleave', handleDragLeave);
+                    li.addEventListener('drop', (e) => handleDrop(e, realIndex, 'log'));
+                    li.addEventListener('dragend', handleDragEnd);
+                }
+
+                const tagsHtml = log.tags ? log.tags.split(',').map(t => `<span class="log-tag">${t.trim()}</span>`).join('') : '';
+
+                li.innerHTML = `
+                    <div class="log-content">
+                        <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+                            <span class="log-category-badge">${log.category}</span>
+                            <a href="${log.url}" target="_blank" class="log-title" style="margin-bottom:0;">${log.title}</a>
+                        </div>
+                        <div class="log-meta">
+                            ${tagsHtml}
+                            <span style="margin-left:auto;">${log.date || ''}</span>
+                        </div>
+                        ${log.memo ? `<div style="font-size:0.85rem; color:#666; margin-top:5px;">${log.memo}</div>` : ''}
+                    </div>
+                    <div style="display:flex; flex-direction:column; gap:5px; margin-left:15px;">
+                        <button class="icon-btn" onclick="editLog(${realIndex})">✎</button>
+                        <button class="icon-btn" onclick="confirmDelete('log', ${realIndex})">🗑</button>
+                    </div>
+                `;
+                list.appendChild(li);
+            });
+        }
+        document.getElementById('logSearchInput').addEventListener('input', renderLogs);
+
+        function renderDrive() {
+            const grid = document.getElementById('driveGrid');
+            grid.innerHTML = '';
+            const breadcrumb = document.getElementById('driveBreadcrumb');
+            breadcrumb.innerHTML = '';
+
+            const currentFolderId = state.currentDriveFolderId;
+
+            // Breadcrumb
+            const rootSpan = document.createElement('span');
+            rootSpan.className = currentFolderId ? 'breadcrumb-item' : 'breadcrumb-current';
+            rootSpan.innerHTML = '📂 ルート';
+            rootSpan.onclick = () => { if(currentFolderId) { state.currentDriveFolderId = null; renderDrive(); }};
+            breadcrumb.appendChild(rootSpan);
+
+            if (currentFolderId) {
+                let path = [];
+                let curr = state.driveLinks.find(d => d.id === currentFolderId);
+                while(curr) {
+                    path.unshift(curr);
+                    if(curr.parentId) {
+                        curr = state.driveLinks.find(d => d.id === curr.parentId);
+                    } else {
+                        curr = null;
+                    }
+                }
+                path.forEach(folder => {
+                    const sep = document.createElement('span');
+                    sep.className = 'breadcrumb-separator';
+                    sep.textContent = ' > ';
+                    breadcrumb.appendChild(sep);
+
+                    const span = document.createElement('span');
+                    const isLast = folder.id === currentFolderId;
+                    span.className = isLast ? 'breadcrumb-current' : 'breadcrumb-item';
+                    span.textContent = folder.name;
+                    if(!isLast) span.onclick = () => { state.currentDriveFolderId = folder.id; renderDrive(); };
+                    breadcrumb.appendChild(span);
+                });
+            }
+
+            const items = state.driveLinks.filter(d => d.parentId === currentFolderId);
+
+            const iconMap = {
+                folder: '📁', doc: '📄', sheet: '📊', slide: '📑', form: '📝', other: '🔗', folder_container: '📁'
+            };
+
+            items.forEach((link, displayIndex) => {
+                const card = document.createElement('div');
+                card.className = `drive-card ${link.type === 'folder_container' ? 'is-folder' : ''} draggable`;
+                
+                card.draggable = true;
+                card.addEventListener('dragstart', (e) => handleDragStart(e, displayIndex, 'drive'));
+                card.addEventListener('dragover', handleDragOver);
+                card.addEventListener('dragenter', handleDragEnter);
+                card.addEventListener('dragleave', handleDragLeave);
+                card.addEventListener('drop', (e) => handleDrop(e, displayIndex, 'drive'));
+                card.addEventListener('dragend', handleDragEnd);
+
+                if (link.type === 'folder_container') {
+                    card.onclick = () => { state.currentDriveFolderId = link.id; renderDrive(); };
+                } else {
+                    card.onclick = () => window.open(link.url, '_blank');
+                }
+
+                card.innerHTML = `
+                    <div style="position:absolute; top:5px; right:5px; display:flex;">
+                         <button class="icon-btn" style="font-size:0.8rem;" onclick="event.stopPropagation(); editDrive(${state.driveLinks.indexOf(link)})">✎</button>
+                         <button class="icon-btn" style="font-size:0.8rem;" onclick="event.stopPropagation(); confirmDelete('drive', ${state.driveLinks.indexOf(link)})">🗑</button>
+                    </div>
+                    <div class="drive-icon">${iconMap[link.type] || '🔗'}</div>
+                    <div class="drive-name">${link.name}</div>
+                    <div class="drive-type">${link.type === 'folder_container' ? 'フォルダ (内部)' : link.type.toUpperCase()}</div>
+                `;
+                grid.appendChild(card);
+            });
+
+            if (items.length === 0) {
+                 grid.innerHTML = '<p style="color:#999; grid-column:1/-1; text-align:center;">このフォルダは空です</p>';
+            }
+            
+            const addCard = document.createElement('div');
+            addCard.className = 'drive-card';
+            addCard.style.border = '2px dashed #ddd';
+            addCard.style.boxShadow = 'none';
+            addCard.innerHTML = `<div class="drive-icon" style="color:#ddd;">＋</div><div class="drive-name" style="color:#aaa;">追加</div>`;
+            addCard.onclick = () => openModal('driveModal');
+            grid.appendChild(addCard);
+        }
+
+        window.toggleDriveUrlInput = () => {
+            const type = document.getElementById('driveInputType').value;
+            const urlGroup = document.getElementById('driveUrlGroup');
+            const urlInput = document.getElementById('driveInputUrl');
+            if (type === 'folder_container') {
+                urlGroup.style.display = 'none';
+                urlInput.required = false;
+            } else {
+                urlGroup.style.display = 'block';
+                urlInput.required = true;
+            }
+        };
+
+        // --- Common Modal & Form Handlers ---
+        function openModal(id) {
+            if(id === 'appModal') {
+                const isEdit = document.getElementById('appEditIndex').value !== '-1';
+                document.getElementById('appModalTitle').textContent = isEdit ? 'アプリ編集' : 'アプリ登録';
+                const sel = document.getElementById('appInputCategory');
+                sel.innerHTML = '';
+                state.categories.forEach(c => sel.add(new Option(c, c)));
+                if (!isEdit) {
+                    document.getElementById('appForm').reset();
+                    if(state.appFilter !== 'ALL') sel.value = state.appFilter;
+                }
+            } else if (id === 'logModal') {
+                const isEdit = document.getElementById('logEditIndex').value !== '-1';
+                document.getElementById('logModalTitle').textContent = isEdit ? 'ログ編集' : 'ログ登録';
+                const sel = document.getElementById('logInputCategory');
+                sel.innerHTML = '';
+                state.categories.forEach(c => sel.add(new Option(c, c)));
+                if (!isEdit) {
+                     document.getElementById('logForm').reset();
+                     if(state.logFilter !== 'ALL') sel.value = state.logFilter;
+                }
+            } else if (id === 'driveModal') {
+                const isEdit = document.getElementById('driveEditIndex').value !== '-1';
+                document.getElementById('driveModalTitle').textContent = isEdit ? 'アイテム編集' : 'アイテム登録';
+                if (!isEdit) {
+                    document.getElementById('driveForm').reset();
+                    toggleDriveUrlInput(); 
+                }
+            } else if (id === 'categoryModal') {
+                renderCategoryList();
+            }
+
+            document.getElementById(id).classList.add('active');
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).classList.remove('active');
+            if(id === 'appModal') document.getElementById('appEditIndex').value = '-1';
+            if(id === 'logModal') document.getElementById('logEditIndex').value = '-1';
+            if(id === 'driveModal') document.getElementById('driveEditIndex').value = '-1';
+        }
+
+        function setupForms() {
+            document.getElementById('appForm').addEventListener('submit', e => {
+                e.preventDefault();
+                const idx = parseInt(document.getElementById('appEditIndex').value);
+                const data = {
+                    category: document.getElementById('appInputCategory').value,
+                    icon: document.getElementById('appInputIcon').value,
+                    title: document.getElementById('appInputTitle').value,
+                    desc: document.getElementById('appInputDesc').value,
+                    url: document.getElementById('appInputUrl').value,
+                    chatUrl: document.getElementById('appInputChatUrl').value,
+                };
+                if (idx >= 0) state.apps[idx] = data;
+                else state.apps.push(data);
+                
+                saveData(KEYS.APPS);
+                renderApps();
+                closeModal('appModal');
+            });
+
+            document.getElementById('logForm').addEventListener('submit', e => {
+                e.preventDefault();
+                const idx = parseInt(document.getElementById('logEditIndex').value);
+                const now = new Date();
+                const data = {
+                    category: document.getElementById('logInputCategory').value,
+                    title: document.getElementById('logInputTitle').value,
+                    url: document.getElementById('logInputUrl').value,
+                    tags: document.getElementById('logInputTags').value,
+                    memo: document.getElementById('logInputMemo').value,
+                    date: idx >= 0 ? state.logs[idx].date : now.toISOString().split('T')[0]
+                };
+                if (idx >= 0) state.logs[idx] = data;
+                else state.logs.push(data);
+
+                saveData(KEYS.LOGS);
+                renderLogs();
+                closeModal('logModal');
+            });
+
+            document.getElementById('driveForm').addEventListener('submit', e => {
+                e.preventDefault();
+                const idx = parseInt(document.getElementById('driveEditIndex').value);
+                const type = document.getElementById('driveInputType').value;
+                const data = {
+                    id: idx >= 0 ? state.driveLinks[idx].id : crypto.randomUUID(),
+                    parentId: idx >= 0 ? state.driveLinks[idx].parentId : state.currentDriveFolderId,
+                    name: document.getElementById('driveInputName').value,
+                    url: type === 'folder_container' ? '' : document.getElementById('driveInputUrl').value,
+                    type: type
+                };
+                if (idx >= 0) state.driveLinks[idx] = data;
+                else state.driveLinks.push(data);
+
+                saveData(KEYS.DRIVE);
+                renderDrive();
+                closeModal('driveModal');
+            });
+
+            document.getElementById('confirmDeleteBtn').addEventListener('click', () => {
+                const { type, index, id } = state.deleteContext;
+                if (type === 'app') {
+                    state.apps.splice(index, 1);
+                    saveData(KEYS.APPS);
+                    renderApps();
+                } else if (type === 'log') {
+                    state.logs.splice(index, 1);
+                    saveData(KEYS.LOGS);
+                    renderLogs();
+                } else if (type === 'drive') {
+                    const targetId = state.driveLinks[index].id;
+                    const deleteIds = [targetId];
+                    const findChildren = (pid) => {
+                        state.driveLinks.forEach(d => {
+                            if(d.parentId === pid) {
+                                deleteIds.push(d.id);
+                                findChildren(d.id);
+                            }
+                        });
+                    };
+                    findChildren(targetId);
+                    
+                    state.driveLinks = state.driveLinks.filter(d => !deleteIds.includes(d.id));
+                    saveData(KEYS.DRIVE);
+                    renderDrive();
+                } else if (type === 'cat') {
+                    const catName = id;
+                    state.categories = state.categories.filter(c => c !== catName);
+                    if (!state.categories.includes('未分類')) state.categories.push('未分類');
+                    state.apps.forEach(a => { if(a.category === catName) a.category = '未分類'; });
+                    state.logs.forEach(l => { if(l.category === catName) l.category = '未分類'; });
+                    saveData(KEYS.APPS);
+                    saveData(KEYS.CATS);
+                    saveData(KEYS.LOGS);
+                    renderApps();
+                    renderLogs();
+                    renderCategoryList();
+                }
+                closeModal('deleteModal');
+            });
+
+            document.getElementById('addCategoryBtn').addEventListener('click', () => {
+                const val = document.getElementById('newCategoryInput').value.trim();
+                if(val && !state.categories.includes(val)) {
+                    state.categories.push(val);
+                    saveData(KEYS.CATS);
+                    renderCategoryList();
+                    renderApps();
+                    renderLogs();
+                    document.getElementById('newCategoryInput').value = '';
+                }
+            });
+        }
+
+        window.editApp = (i) => {
+            const d = state.apps[i];
+            document.getElementById('appEditIndex').value = i;
+            const sel = document.getElementById('appInputCategory');
+            sel.innerHTML = '';
+            state.categories.forEach(c => sel.add(new Option(c, c)));
+            sel.value = d.category;
+            document.getElementById('appInputIcon').value = d.icon;
+            document.getElementById('appInputTitle').value = d.title;
+            document.getElementById('appInputDesc').value = d.desc;
+            document.getElementById('appInputUrl').value = d.url;
+            document.getElementById('appInputChatUrl').value = d.chatUrl || '';
+            openModal('appModal');
+        };
+
+        window.editLog = (i) => {
+            const d = state.logs[i];
+            document.getElementById('logEditIndex').value = i;
+            const sel = document.getElementById('logInputCategory');
+            sel.innerHTML = '';
+            state.categories.forEach(c => sel.add(new Option(c, c)));
+            sel.value = d.category;
+            document.getElementById('logInputTitle').value = d.title;
+            document.getElementById('logInputUrl').value = d.url;
+            document.getElementById('logInputTags').value = d.tags || '';
+            document.getElementById('logInputMemo').value = d.memo || '';
+            openModal('logModal');
+        };
+
+        window.editDrive = (i) => {
+            const d = state.driveLinks[i];
+            document.getElementById('driveEditIndex').value = i;
+            document.getElementById('driveInputName').value = d.name;
+            document.getElementById('driveInputUrl').value = d.url || '';
+            document.getElementById('driveInputType').value = d.type;
+            toggleDriveUrlInput();
+            openModal('driveModal');
+        };
+
+        window.confirmDelete = (type, index, id = null) => {
+            state.deleteContext = { type, index, id };
+            let msg = "削除しますか？";
+            if(type === 'cat') msg = `カテゴリー「${id}」を削除しますか？\n含まれるデータは未分類になります。`;
+            if(type === 'drive') {
+                const item = state.driveLinks[index];
+                if(item.type === 'folder_container') msg = `フォルダ「${item.name}」を削除しますか？\n中身もすべて削除されます。`;
+            }
+            document.getElementById('deleteMessage').innerText = msg;
+            document.getElementById('deleteModal').classList.add('active');
+        };
+
+        window.openCategoryModal = () => openModal('categoryModal');
+        
+        function renderCategoryList() {
+            const list = document.getElementById('categoryList');
+            list.innerHTML = '';
+            state.categories.forEach((cat, index) => {
+                const li = document.createElement('li');
+                li.className = 'log-item';
+                if (index === state.editingCatIndex) {
+                    li.innerHTML = `
+                        <input type="text" id="editCatInput" class="form-control" value="${cat}" style="flex:1; margin-right:10px;">
+                        <button class="icon-btn" onclick="saveCatEdit(${index})">✔</button>
+                        <button class="icon-btn" onclick="cancelCatEdit()">✕</button>
+                    `;
+                } else {
+                    const isSystem = cat === '未分類';
+                    li.innerHTML = `
+                        <span style="flex:1;">${cat}</span>
+                        ${!isSystem ? `
+                            <button class="icon-btn" onclick="startCatEdit(${index})">✎</button>
+                            <button class="icon-btn" onclick="confirmDelete('cat', ${index}, '${cat}')">🗑</button>
+                        ` : '<span style="font-size:0.8rem; color:#999;">固定</span>'}
+                    `;
+                }
+                list.appendChild(li);
+            });
+        }
+
+        window.startCatEdit = (i) => { state.editingCatIndex = i; renderCategoryList(); };
+        window.cancelCatEdit = () => { state.editingCatIndex = -1; renderCategoryList(); };
+        window.saveCatEdit = (i) => {
+            const val = document.getElementById('editCatInput').value.trim();
+            if(val && !state.categories.includes(val)) {
+                const old = state.categories[i];
+                state.categories[i] = val;
+                state.apps.forEach(a => { if(a.category === old) a.category = val; });
+                state.logs.forEach(l => { if(l.category === old) l.category = val; });
+                saveData(KEYS.APPS);
+                saveData(KEYS.CATS);
+                saveData(KEYS.LOGS);
+                state.editingCatIndex = -1;
+                renderCategoryList();
+                renderApps();
+                renderLogs();
+            } else {
+                alert('無効な名前か、既に存在します');
+            }
+        };
+
+    </script>
+</body>
+</html>
