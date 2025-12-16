@@ -407,6 +407,44 @@
         .backup-action h4 { margin-bottom: 10px; font-size: 1.1rem; }
         .backup-action p { font-size: 0.9rem; color: #666; margin-bottom: 15px; }
 
+        /* トースト通知 */
+        .toast-container {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 2000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            pointer-events: none;
+        }
+
+        .toast {
+            background: rgba(0, 0, 0, 0.85);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 50px;
+            font-size: 0.95rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 0.3s, transform 0.3s;
+            pointer-events: auto;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            white-space: nowrap;
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .toast.success { border-left: 4px solid var(--secondary-color); }
+        .toast.error { border-left: 4px solid #d32f2f; }
+
         /* FAB */
         .fab {
             position: fixed;
@@ -628,6 +666,9 @@
     <!-- FAB -->
     <button id="fabBtn" class="fab">＋</button>
 
+    <!-- トースト通知 -->
+    <div id="toastContainer" class="toast-container"></div>
+
     <!-- アプリ登録モーダル -->
     <div id="appModal" class="modal-overlay">
         <div class="modal-content">
@@ -773,7 +814,8 @@
                 <p>作成したWebアプリをカード形式で整理します。</p>
                 <ul style="padding-left: 20px;">
                     <li><strong>起動:</strong> 緑色の「起動する」ボタンを押すと、新しいタブでアプリが開きます。</li>
-                    <li><strong>新規登録:</strong> 画面右下の <span style="background:var(--secondary-color); color:white; padding:2px 6px; border-radius:50%;">＋</span> ボタンを押して登録します。</li>
+                    <li><strong>新規登録:</strong> 画面右下の <span style="background:var(--secondary-color); color:white; padding:2px 6px; border-radius:50%;">＋</span> ボタンを押して登録します。<br>
+                    <small style="color:var(--primary-color);">※保存時、自動的にスプレッドシート貼付用のテキストがコピーされます（タイトル/URL/GeminiURL）。</small></li>
                     <li><strong>編集:</strong> カード右上の <span style="background:#eee; padding:2px 5px; border-radius:4px;">✎</span> アイコンで内容を修正できます。</li>
                     <li><strong>削除:</strong> カード右上の <span style="background:#eee; padding:2px 5px; border-radius:4px;">🗑</span> アイコンで削除します（確認画面が出ます）。</li>
                     <li><strong>並び替え:</strong> カードを長押ししてドラッグすると並び替えができます。<br><small style="color:#d32f2f;">※並び替えは、検索ボックスが空で、カテゴリーが「すべて」の時のみ有効です。</small></li>
@@ -940,14 +982,14 @@
                             saveData(KEYS.DRIVE);
                             
                             renderAllSections();
-                            alert('データの復元が完了しました。');
+                            showToast('データを復元しました', 'success');
                         }
                     } else {
-                        alert('不正なファイル形式です。');
+                        showToast('不正なファイル形式です', 'error');
                     }
                 } catch (err) {
                     console.error(err);
-                    alert('ファイルの読み込みに失敗しました。');
+                    showToast('読み込みに失敗しました', 'error');
                 }
                 input.value = ''; // Reset input
             };
@@ -963,6 +1005,31 @@
                 location.reload(); // リロードして初期化
             }
         };
+
+        // --- Toast Notification ---
+        function showToast(message, type = 'normal') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            
+            let icon = '';
+            if (type === 'success') icon = '✅';
+            if (type === 'error') icon = '⚠️';
+            
+            toast.innerHTML = `<span>${icon}</span> ${message}`;
+            container.appendChild(toast);
+
+            requestAnimationFrame(() => {
+                toast.classList.add('show');
+            });
+
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => {
+                    toast.remove();
+                }, 300);
+            }, 3000);
+        }
 
         // --- D&D Handlers ---
         function handleDragStart(e, index, type) {
@@ -1180,6 +1247,7 @@
 
                 card.innerHTML = `
                     <div class="admin-controls">
+                        <button class="icon-btn" onclick="copyAppInfo(${realIndex})" title="情報をコピー">📋</button>
                         <button class="icon-btn" onclick="editApp(${realIndex})">✎</button>
                         <button class="icon-btn" onclick="confirmDelete('app', ${realIndex})">🗑</button>
                     </div>
@@ -1433,9 +1501,14 @@
                 if (idx >= 0) state.apps[idx] = data;
                 else state.apps.push(data);
                 
+                // クリップボードへコピー（スプレッドシート用：タブ区切り）
+                const copyText = `${data.title}\t${data.url}\t${data.chatUrl}`;
+                copyTextToClipboard(copyText, false);
+
                 saveData(KEYS.APPS);
                 renderApps();
                 closeModal('appModal');
+                showToast('アプリを保存しました', 'success');
             });
 
             document.getElementById('logForm').addEventListener('submit', e => {
@@ -1456,6 +1529,7 @@
                 saveData(KEYS.LOGS);
                 renderLogs();
                 closeModal('logModal');
+                showToast('ログを保存しました', 'success');
             });
 
             document.getElementById('driveForm').addEventListener('submit', e => {
@@ -1475,6 +1549,7 @@
                 saveData(KEYS.DRIVE);
                 renderDrive();
                 closeModal('driveModal');
+                showToast('アイテムを保存しました', 'success');
             });
 
             document.getElementById('confirmDeleteBtn').addEventListener('click', () => {
@@ -1517,6 +1592,7 @@
                     renderCategoryList();
                 }
                 closeModal('deleteModal');
+                showToast('削除しました', 'success');
             });
 
             document.getElementById('addCategoryBtn').addEventListener('click', () => {
@@ -1528,6 +1604,7 @@
                     renderApps();
                     renderLogs();
                     document.getElementById('newCategoryInput').value = '';
+                    showToast('カテゴリーを追加しました', 'success');
                 }
             });
         }
@@ -1591,18 +1668,6 @@
             state.categories.forEach((cat, index) => {
                 const li = document.createElement('li');
                 li.className = 'log-item';
-                // 編集中でなければドラッグ可能に
-                if (state.editingCatIndex === -1) {
-                    li.classList.add('draggable');
-                    li.draggable = true;
-                    li.addEventListener('dragstart', (e) => handleDragStart(e, index, 'category'));
-                    li.addEventListener('dragover', handleDragOver);
-                    li.addEventListener('dragenter', handleDragEnter);
-                    li.addEventListener('dragleave', handleDragLeave);
-                    li.addEventListener('drop', (e) => handleDrop(e, index, 'category'));
-                    li.addEventListener('dragend', handleDragEnd);
-                }
-
                 if (index === state.editingCatIndex) {
                     li.innerHTML = `
                         <input type="text" id="editCatInput" class="form-control" value="${cat}" style="flex:1; margin-right:10px;">
@@ -1639,9 +1704,38 @@
                 renderCategoryList();
                 renderApps();
                 renderLogs();
+                showToast('カテゴリー名を変更しました', 'success');
             } else {
-                alert('無効な名前か、既に存在します');
+                showToast('無効な名前か、既に存在します', 'error');
             }
+        };
+
+        function copyTextToClipboard(text, showNotification = true) {
+            const tempInput = document.createElement('textarea');
+            tempInput.style.position = 'fixed';
+            tempInput.style.left = '-9999px';
+            tempInput.value = text;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            
+            try {
+                document.execCommand('copy');
+                if (showNotification) {
+                    showToast('コピーしました！', 'success');
+                }
+            } catch (e) {
+                console.error('Copy failed', e);
+                if (showNotification) {
+                    showToast('コピーに失敗しました', 'error');
+                }
+            }
+            document.body.removeChild(tempInput);
+        }
+
+        window.copyAppInfo = (index) => {
+            const app = state.apps[index];
+            const copyText = `${app.title}\t${app.url}\t${app.chatUrl || ''}`;
+            copyTextToClipboard(copyText, true);
         };
 
     </script>
