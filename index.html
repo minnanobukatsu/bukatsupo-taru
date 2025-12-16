@@ -738,7 +738,7 @@
     <div id="categoryModal" class="modal-overlay">
         <div class="modal-content">
             <h2 class="section-title">カテゴリー管理</h2>
-            <p style="font-size:0.9rem; margin-bottom:10px;">アプリとGeminiログ共通のカテゴリーです。</p>
+            <p style="font-size:0.9rem; margin-bottom:10px;">アプリとGeminiログ共通のカテゴリーです。<br>ドラッグして並び替えできます。</p>
             <ul id="categoryList" class="log-list"></ul>
             <div class="form-group" style="display:flex; gap:10px; margin-top:20px;">
                 <input type="text" id="newCategoryInput" class="form-control" placeholder="新規カテゴリー">
@@ -792,6 +792,12 @@
                     <li><strong>階層管理:</strong> アイテム追加時に「種類」で<strong>「📁 フォルダ（整理用・内部作成）」</strong>を選ぶと、このアプリ内だけの整理用フォルダを作れます。</li>
                     <li><strong>移動:</strong> フォルダをクリックすると中に入ります。上の「📂 ルート > ...」を押すと戻れます。</li>
                     <li><strong>並び替え:</strong> アイコンをドラッグして自由に配置を変更できます。</li>
+                </ul>
+
+                <h3 style="color:var(--primary-color); border-bottom:2px solid #e0e0e0; padding-bottom:5px; margin-top:25px; margin-bottom: 10px;">⚙️ カテゴリー設定</h3>
+                <p>アプリ図鑑とGeminiログの共通カテゴリーを編集できます。</p>
+                <ul style="padding-left: 20px;">
+                    <li><strong>並び替え:</strong> カテゴリー名をドラッグして並び順を変更できます。</li>
                 </ul>
 
                 <h3 style="color:var(--primary-color); border-bottom:2px solid #e0e0e0; padding-bottom:5px; margin-top:25px; margin-bottom: 10px;">💾 データの保存とバックアップ</h3>
@@ -994,6 +1000,7 @@
                 if (type === 'app') reorderApps(srcIndex, dropIndex);
                 if (type === 'log') reorderLogs(srcIndex, dropIndex);
                 if (type === 'drive') reorderDrive(srcIndex, dropIndex);
+                if (type === 'category') reorderCategories(srcIndex, dropIndex);
             }
             return false;
         }
@@ -1037,6 +1044,16 @@
             
             saveData(KEYS.DRIVE);
             renderDrive();
+        }
+
+        function reorderCategories(src, dst) {
+            const item = state.categories[src];
+            state.categories.splice(src, 1);
+            state.categories.splice(dst, 0, item);
+            saveData(KEYS.CATS);
+            renderCategoryList();
+            renderApps();
+            renderLogs();
         }
 
         // --- UI Setup ---
@@ -1574,6 +1591,18 @@
             state.categories.forEach((cat, index) => {
                 const li = document.createElement('li');
                 li.className = 'log-item';
+                // 編集中でなければドラッグ可能に
+                if (state.editingCatIndex === -1) {
+                    li.classList.add('draggable');
+                    li.draggable = true;
+                    li.addEventListener('dragstart', (e) => handleDragStart(e, index, 'category'));
+                    li.addEventListener('dragover', handleDragOver);
+                    li.addEventListener('dragenter', handleDragEnter);
+                    li.addEventListener('dragleave', handleDragLeave);
+                    li.addEventListener('drop', (e) => handleDrop(e, index, 'category'));
+                    li.addEventListener('dragend', handleDragEnd);
+                }
+
                 if (index === state.editingCatIndex) {
                     li.innerHTML = `
                         <input type="text" id="editCatInput" class="form-control" value="${cat}" style="flex:1; margin-right:10px;">
