@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>みんなのBUKATSU 秘書</title>
+    <title>みんなのBUKATSU アプリ図鑑</title>
     <meta name="description" content="部活動運営をサポートする統合管理ツール">
     <style>
         :root {
@@ -84,7 +84,7 @@
         }
 
         .app-title {
-            font-size: 1.2rem;
+            font-size: 1.1rem;
             font-weight: 700;
             letter-spacing: 0.05em;
             display: flex;
@@ -226,33 +226,6 @@
             font-size: 1rem;
             margin-bottom: 20px;
         }
-
-        /* --- HOMEセクション --- */
-        .dashboard-header {
-            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-            color: white;
-            padding: 30px;
-            border-radius: var(--radius);
-            margin-bottom: 20px;
-            box-shadow: var(--shadow);
-        }
-        .greeting { font-size: 1.8rem; font-weight: bold; margin-bottom: 10px; }
-        .date-display { font-size: 1rem; opacity: 0.9; }
-
-        .quick-stats {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-        }
-        .stat-card {
-            background: white;
-            padding: 20px;
-            border-radius: var(--radius);
-            box-shadow: var(--shadow);
-            text-align: center;
-        }
-        .stat-value { font-size: 2rem; font-weight: bold; color: var(--primary-color); }
-        .stat-label { color: var(--text-sub); font-size: 0.9rem; }
 
         /* --- アプリ図鑑セクション --- */
         .category-filter {
@@ -526,15 +499,11 @@
     <nav id="sidebar" class="sidebar">
         <div class="logo-area">
             <div class="app-title">
-                <span>⚡</span> <span>みんなのBUKATSU 秘書</span>
+                <span>📖</span> <span>みんなのBUKATSU アプリ図鑑</span>
             </div>
         </div>
         <ul class="nav-menu">
-            <li class="nav-item active" data-target="home">
-                <span class="nav-icon">🏠</span>
-                <span class="nav-text">ホーム</span>
-            </li>
-            <li class="nav-item" data-target="apps">
+            <li class="nav-item active" data-target="apps">
                 <span class="nav-icon">📱</span>
                 <span class="nav-text">アプリ図鑑</span>
             </li>
@@ -560,33 +529,8 @@
     <!-- メインコンテンツ -->
     <main class="main-content">
         
-        <!-- ホームセクション -->
-        <section id="section-home" class="content-section active">
-            <div class="dashboard-header">
-                <div class="greeting" id="greetingMsg">こんにちは！</div>
-                <div class="date-display" id="dateDisplay">2023年1月1日</div>
-            </div>
-            <div class="section-header">
-                <h2 class="section-title">📊 ステータス</h2>
-            </div>
-            <div class="quick-stats">
-                <div class="stat-card">
-                    <div class="stat-value" id="statAppCount">0</div>
-                    <div class="stat-label">登録アプリ</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="statLogCount">0</div>
-                    <div class="stat-label">Geminiログ</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="statDriveCount">0</div>
-                    <div class="stat-label">ドライブアイテム</div>
-                </div>
-            </div>
-        </section>
-
-        <!-- アプリ図鑑セクション -->
-        <section id="section-apps" class="content-section">
+        <!-- アプリ図鑑セクション (初期表示) -->
+        <section id="section-apps" class="content-section active">
             <div class="section-header">
                 <h2 class="section-title">📱 アプリ図鑑</h2>
                 <div style="display:flex; align-items:center; gap:10px;">
@@ -884,7 +828,7 @@
         };
 
         let state = {
-            currentTab: 'home',
+            currentTab: 'apps', // アプリ図鑑をデフォルトに
             apps: [],
             categories: [],
             logs: [],
@@ -900,28 +844,52 @@
 
         document.addEventListener('DOMContentLoaded', () => {
             loadData();
-            updateDashboard();
+            // updateDashboard(); // Dashboard removed from main view
             setupNavigation();
             setupForms();
             setupSidebarToggle();
             renderAllSections();
-            updateTime();
-            setInterval(updateTime, 60000);
+            // updateTime();
+            // setInterval(updateTime, 60000);
         });
 
-        // --- Data Loading ---
+        // --- Data Loading & Migration ---
         function loadData() {
-            const savedApps = localStorage.getItem(KEYS.APPS);
-            state.apps = savedApps ? JSON.parse(savedApps) : [...initialApps];
-            state.apps = state.apps.map(a => ({...a, category: a.category || "未分類"}));
+            // Load Apps
+            const savedAppsStr = localStorage.getItem(KEYS.APPS);
+            let loadedApps = savedAppsStr ? JSON.parse(savedAppsStr) : [...initialApps];
+            
+            // Migration: Add missing initial apps
+            // URLをキーにして、存在しない初期アプリを追加する
+            const existingUrls = new Set(loadedApps.map(app => app.url));
+            let addedCount = 0;
+            
+            initialApps.forEach(initApp => {
+                if (!existingUrls.has(initApp.url)) {
+                    loadedApps.push(initApp);
+                    existingUrls.add(initApp.url);
+                    addedCount++;
+                }
+            });
+            
+            // 保存（追加があった場合のみ保存しても良いが、マイグレーションとして常に最新状態を確保）
+            if (addedCount > 0) {
+                localStorage.setItem(KEYS.APPS, JSON.stringify(loadedApps));
+                // showToast(`${addedCount}個の新しいアプリを追加しました`, 'success'); // 初期ロード時はトースト出さない方が安全
+            }
+            
+            state.apps = loadedApps.map(a => ({...a, category: a.category || "未分類"}));
 
+            // Load Categories
             const savedCats = localStorage.getItem(KEYS.CATS);
             state.categories = savedCats ? JSON.parse(savedCats) : [...initialCategories];
 
+            // Load Logs
             const savedLogs = localStorage.getItem(KEYS.LOGS);
             state.logs = savedLogs ? JSON.parse(savedLogs) : [];
             state.logs = state.logs.map(l => ({...l, category: l.category || "未分類"}));
 
+            // Load Drive
             const savedDrive = localStorage.getItem(KEYS.DRIVE);
             state.driveLinks = savedDrive ? JSON.parse(savedDrive) : [];
             state.driveLinks = state.driveLinks.map(d => ({
@@ -937,7 +905,7 @@
             if (key === KEYS.CATS) localStorage.setItem(KEYS.CATS, JSON.stringify(state.categories));
             if (key === KEYS.LOGS) localStorage.setItem(KEYS.LOGS, JSON.stringify(state.logs));
             if (key === KEYS.DRIVE) localStorage.setItem(KEYS.DRIVE, JSON.stringify(state.driveLinks));
-            updateDashboard(); 
+            // updateDashboard(); 
         }
 
         // --- Export / Import / Reset ---
@@ -1149,7 +1117,7 @@
                         document.getElementById(`section-${target}`).classList.add('active');
 
                         // FAB制御
-                        if (target === 'home' || target === 'settings') fab.style.display = 'none';
+                        if (target === 'settings') fab.style.display = 'none';
                         else fab.style.display = 'flex';
                     });
                 }
@@ -1165,27 +1133,9 @@
                 if (state.currentTab === 'drive') openModal('driveModal');
             });
 
-            document.getElementById(`section-home`).classList.add('active');
-            fab.style.display = 'none';
-        }
-
-        function updateTime() {
-            const now = new Date();
-            const dateStr = now.toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' });
-            const timeStr = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
-            document.getElementById('dateDisplay').textContent = `${dateStr} ${timeStr}`;
-            
-            const hour = now.getHours();
-            let greet = "こんにちは！";
-            if (hour < 12) greet = "おはようございます！";
-            else if (hour > 17) greet = "お疲れ様です！";
-            document.getElementById('greetingMsg').textContent = greet;
-        }
-
-        function updateDashboard() {
-            document.getElementById('statAppCount').textContent = state.apps.length;
-            document.getElementById('statLogCount').textContent = state.logs.length;
-            document.getElementById('statDriveCount').textContent = state.driveLinks.length;
+            // Default active
+            // document.getElementById(`section-home`).classList.add('active'); // Removed home
+            fab.style.display = 'flex'; // Default for apps
         }
 
         function renderAllSections() {
